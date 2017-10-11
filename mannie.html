@@ -49,7 +49,7 @@
 			    animate();
 			} else {
 			    var warning = Detector.getWebGLErrorMessage();
-			    document.getElementById('container').appendChild(warning);
+			    document.body.appendChild( warning );
 			}
 
 			document.body.appendChild( renderer.domElement );
