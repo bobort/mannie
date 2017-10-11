@@ -1,10 +1,5 @@
 //board.js
-'use strict';
-var expect = require('chai').expect;
-
-describe('Sprite', function() {
-  it('should exist'), function() {
-    var Sprite = require('./sprite.js');
-    expect(Sprite).to.not.be.undefined;
-  }
-}
+var geometry = new THREE.PlaneGeometry(100, 100);
+var material = new THREE.MeshBasicMaterial({color: 0xffff00});
+var floor = new THREE.Mesh(geometry, material);
+var board = floor;
