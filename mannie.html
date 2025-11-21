@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MANNIE - The Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #000080;
+            color: #0ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        #gameContainer {
+            background-color: #000080;
+            border: 2px solid #0ff;
+            padding: 10px;
+        }
+        
+        #gameCanvas {
+            border: 1px solid #0ff;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        #infoPanel {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px;
+            font-size: 14px;
+            color: #fff;
+            gap: 20px;
+        }
+        
+        #infoPanel > div {
+            white-space: nowrap;
+        }
+        
+        #helpScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000080;
+            color: #0ff;
+            padding: 20px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+        
+        #helpContent {
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        #helpContent h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #0ff;
+            padding-bottom: 10px;
+        }
+        
+        #helpContent p {
+            margin-bottom: 10px;
+        }
+        
+        .closeHelp {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 24px;
+            color: #0ff;
+        }
+        
+        #pauseOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 128, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            color: #fff;
+            font-size: 24px;
+        }
+        
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000080;
+            color: #fff;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1001;
+        }
+        
+        #highScoreScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000080;
+            color: #fff;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1002;
+        }
+        
+        .closeHighScore {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 24px;
+            color: #0ff;
+        }
+        
+        #initialsInput {
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 18px;
+            background-color: #000080;
+            color: #fff;
+            border: 2px solid #0ff;
+            text-align: center;
+            text-transform: uppercase;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="infoPanel">
+            <div id="inventory">♠=0    ♣=0    ♦=0    ♥=0</div>
+            <div id="score">Score: 0</div>
+            <div id="time">Time: 210</div>
+            <div style="display: flex; gap: 5px;">
+                <button id="viewTopTenBtn" onclick="showTopTenFromMain()" style="padding: 5px 10px; font-size: 12px; background-color: #0ff; color: #000080; border: 1px solid #0ff; cursor: pointer; font-family: 'Courier New', monospace;">Top 10</button>
+                <button id="viewHelpBtn" onclick="showHelp()" style="padding: 5px 10px; font-size: 12px; background-color: #0ff; color: #000080; border: 1px solid #0ff; cursor: pointer; font-family: 'Courier New', monospace;">Help</button>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="484"></canvas>
+    </div>
+    
+    <div id="pauseOverlay">
+        <div>Game Paused. Press P to continue.</div>
+    </div>
+    
+    <div id="helpScreen">
+        <span class="closeHelp" onclick="closeHelp()">×</span>
+        <div id="helpContent"></div>
+    </div>
+    
+    <div id="gameOverScreen">
+        <h2>Game Over!</h2>
+        <p id="finalScore">Your total score: 0</p>
+        <p>Press any key to continue...</p>
+        <button id="replayButton" onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; background-color: #0ff; color: #000080; border: 2px solid #0ff; cursor: pointer; font-family: 'Courier New', monospace;">Replay</button>
+    </div>
+    
+    <div id="highScoreScreen">
+        <span class="closeHighScore" onclick="closeHighScore()">×</span>
+        <h2>High Scores</h2>
+        <div id="highScoreList"></div>
+        <div id="initialsContainer" style="display: none;">
+            <p>Enter Initials:</p>
+            <input type="text" id="initialsInput" maxlength="3" autofocus>
+        </div>
+    </div>
+
+    <script>
+        // Game constants
+        const GRID_WIDTH = 40;
+        const GRID_HEIGHT = 22;
+        const CELL_SIZE = 22; // Vertical spacing (10% bigger: 20 * 1.1)
+        const HORIZONTAL_CELL_SIZE = 20; // Horizontal spacing (10% bigger: 18 * 1.1, rounded)
+        const INITIAL_TIME = 210;
+        
+        // Status codes
+        const STATUS_EMPTY = 0;
+        const STATUS_WALL = 11;
+        const STATUS_SPADE = 12;
+        const STATUS_HEART = 13;
+        const STATUS_DIAMOND = 14;
+        const STATUS_CLUB = 15;
+        
+        // Game state
+        let grid = [];
+        let row = 1, col = 1;
+        let score = 0;
+        let time = INITIAL_TIME;
+        let spade = 4, club = 0, diamond = 0, heart = 0;
+        let e = 0, c = 0, i = 0, h = 0; // Counters for items on board
+        let hrtattack = 1;
+        let current = 0;
+        let pop = 0; // Unlimited attacks cheat
+        let soundEnabled = true;
+        let gamePaused = false;
+        let gameRunning = true;
+        let lastTime = Date.now();
+        let lastSecond = Math.floor(Date.now() / 1000);
+        let attackInProgress = false; // Prevent movement during attacks
+        let keyProcessed = false; // Prevent key repeat
+        let diamondAttackActive = false; // Track diamond attack state
+        let destroyedWalls = []; // Track walls destroyed by heart attack for regeneration
+        let wallRegenIntervals = []; // Track intervals for gradual regeneration
+        let wallRegenTimeout = null; // Track the main regeneration timeout
+        let timerPaused = false; // Pause timer during attacks or when viewing top 10
+        
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.font = '16px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Helper function to place items on the grid
+        function placeItems(count, status, allowOverlap = false) {
+            let placed = 0;
+            let attempts = 0;
+            const maxAttempts = count * 100; // Prevent infinite loops
+            
+            while (placed < count && attempts < maxAttempts) {
+                attempts++;
+                const x = Math.floor(Math.random() * GRID_HEIGHT);
+                const y = Math.floor(Math.random() * GRID_WIDTH);
+                
+                if (allowOverlap || grid[x][y].status === STATUS_EMPTY || grid[x][y].status === STATUS_WALL) {
+                    grid[x][y].status = status;
+                    placed++;
+                }
+            }
+            
+            return placed;
+        }
+        
+        // Initialize grid
+        function initGrid() {
+            // Initialize empty grid
+            grid = [];
+            for (let x = 0; x < GRID_HEIGHT; x++) {
+                grid[x] = [];
+                for (let y = 0; y < GRID_WIDTH; y++) {
+                    grid[x][y] = { status: STATUS_EMPTY };
+                }
+            }
+            
+            // Place walls (can overlap)
+            placeItems(500, STATUS_WALL, true);
+            
+            // Place collectible items (cannot overlap with each other, but can be on walls)
+            h = placeItems(50, STATUS_HEART);
+            i = placeItems(50, STATUS_DIAMOND);
+            c = placeItems(50, STATUS_CLUB);
+            e = placeItems(46, STATUS_SPADE);
+            
+            // Find starting position (first empty cell)
+            for (let x = 0; x < GRID_HEIGHT; x++) {
+                for (let y = 0; y < GRID_WIDTH; y++) {
+                    if (grid[x][y].status === STATUS_EMPTY) {
+                        row = x;
+                        col = y;
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Draw functions
+        function drawCell(x, y, status) {
+            const px = y * HORIZONTAL_CELL_SIZE;
+            const py = x * CELL_SIZE;
+            const centerX = px + HORIZONTAL_CELL_SIZE/2;
+            const centerY = py + CELL_SIZE/2;
+            
+            switch(status) {
+                case STATUS_WALL:
+                    // Draw walls as filled rectangles to fill the entire cell
+                    // Check if this wall is regenerating (has opacity property)
+                    const cell = grid[x][y];
+                    const opacity = cell.wallOpacity !== undefined ? cell.wallOpacity : 1.0;
+                    ctx.fillStyle = `rgba(0, 255, 255, ${opacity})`; // Cyan with opacity
+                    ctx.fillRect(px, py, HORIZONTAL_CELL_SIZE, CELL_SIZE);
+                    break;
+                case STATUS_SPADE:
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('♠', centerX, centerY);
+                    break;
+                case STATUS_CLUB:
+                    ctx.fillStyle = '#f00';
+                    ctx.fillText('♣', centerX, centerY);
+                    break;
+                case STATUS_DIAMOND:
+                    ctx.fillStyle = '#ff0';
+                    ctx.fillText('♦', centerX, centerY);
+                    break;
+                case STATUS_HEART:
+                    ctx.fillStyle = '#f0f';
+                    ctx.fillText('♥', centerX, centerY);
+                    break;
+            }
+        }
+        
+        function drawPlayer() {
+            const px = col * HORIZONTAL_CELL_SIZE;
+            const py = row * CELL_SIZE;
+            const centerX = px + HORIZONTAL_CELL_SIZE/2;
+            const centerY = py + CELL_SIZE/2;
+            const radius = Math.min(HORIZONTAL_CELL_SIZE, CELL_SIZE) * 0.4;
+            
+            // Draw yellow circle (face)
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw black outline
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw eyes
+            ctx.fillStyle = '#000';
+            const eyeSize = 2;
+            const eyeOffsetX = radius * 0.3;
+            const eyeOffsetY = -radius * 0.2;
+            ctx.beginPath();
+            ctx.arc(centerX - eyeOffsetX, centerY + eyeOffsetY, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX + eyeOffsetX, centerY + eyeOffsetY, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw smile (arc)
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY + radius * 0.1, radius * 0.5, 0.2, Math.PI - 0.2);
+            ctx.stroke();
+        }
+        
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#000080';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            for (let x = 0; x < GRID_HEIGHT; x++) {
+                for (let y = 0; y < GRID_WIDTH; y++) {
+                    drawCell(x, y, grid[x][y].status);
+                }
+            }
+            
+            // Draw player
+            drawPlayer();
+        }
+        
+        function updateInfo() {
+            document.getElementById('inventory').textContent = 
+                `♠=${spade}    ♣=${club}    ♦=${diamond}    ♥=${heart}`;
+            document.getElementById('score').textContent = `Score: ${score}`;
+            // Color 7 (normal) = light gray, Color 15 (urgent) = bright white
+            const timeColor = time < 11 ? '#fff' : '#ccc';
+            document.getElementById('time').textContent = `Time: ${time}`;
+            document.getElementById('time').style.color = timeColor;
+        }
+        
+        function check(x, y) {
+            if (x < 0 || x >= GRID_HEIGHT || y < 0 || y >= GRID_WIDTH) return;
+            
+            const cell = grid[x][y];
+            
+            // If hrtattack is 0 (attack active), walls should be cleared
+            // If hrtattack is 1 (normal gameplay), walls should remain
+            if (cell.status === STATUS_WALL) {
+                if (hrtattack === 0) {
+                    cell.status = STATUS_EMPTY; // Clear wall during attacks
+                }
+                // If hrtattack === 1, wall stays (no action needed)
+            }
+            // Other statuses (items) are handled by render() - no need to modify here
+        }
+        
+        // Movement
+        function movePlayer(dx, dy) {
+            if (attackInProgress) return; // Don't move during attacks
+            
+            let newRow = row + dx;
+            let newCol = col + dy;
+            
+            // Wrap around
+            if (newRow < 0) newRow = GRID_HEIGHT - 1;
+            if (newRow >= GRID_HEIGHT) newRow = 0;
+            if (newCol < 0) newCol = GRID_WIDTH - 1;
+            if (newCol >= GRID_WIDTH) newCol = 0;
+            
+            // Check for wall collision - if wall, don't move
+            if (grid[newRow][newCol].status === STATUS_WALL) {
+                return; // Stay in current position
+            }
+            
+            row = newRow;
+            col = newCol;
+            
+            // Collect item
+            const cell = grid[row][col];
+            if (cell.status === STATUS_HEART) {
+                score += 50;
+                heart++;
+                h--;
+                if (soundEnabled) playSound(250, 0.5);
+            } else if (cell.status === STATUS_DIAMOND) {
+                score += 20;
+                diamond++;
+                i--;
+                if (soundEnabled) playSound(250, 0.5);
+            } else if (cell.status === STATUS_CLUB) {
+                score += 10;
+                club++;
+                c--;
+                if (soundEnabled) playSound(250, 0.5);
+            } else if (cell.status === STATUS_SPADE) {
+                score += 5;
+                spade++;
+                e--;
+                if (soundEnabled) playSound(250, 0.5);
+            }
+            
+            if (cell.status !== STATUS_EMPTY && cell.status !== STATUS_WALL) {
+                cell.status = STATUS_EMPTY;
+            }
+            
+            updateInfo();
+            render();
+            
+            // Check win condition
+            if (h === 0 && i === 0 && c === 0 && e === 0) {
+                endGame();
+                return; // Stop processing after win
+            }
+        }
+        
+        // Attack helper functions
+        function storeOriginalStates(positions) {
+            const originalStates = new Map();
+            for (let pos of positions) {
+                if (pos[0] >= 0 && pos[0] < GRID_HEIGHT && pos[1] >= 0 && pos[1] < GRID_WIDTH) {
+                    originalStates.set(`${pos[0]},${pos[1]}`, grid[pos[0]][pos[1]].status);
+                }
+            }
+            return originalStates;
+        }
+        
+        function restoreStatesAndClearWalls(positions, originalStates) {
+            for (let pos of positions) {
+                if (pos[0] >= 0 && pos[0] < GRID_HEIGHT && pos[1] >= 0 && pos[1] < GRID_WIDTH) {
+                    const key = `${pos[0]},${pos[1]}`;
+                    const original = originalStates.get(key);
+                    // Only destroy walls, preserve all items and empty cells
+                    if (original === STATUS_WALL) {
+                        grid[pos[0]][pos[1]].status = STATUS_EMPTY;
+                    } else {
+                        grid[pos[0]][pos[1]].status = original;
+                    }
+                }
+            }
+        }
+        
+        function setAttackSymbols(positions, symbol) {
+            for (let pos of positions) {
+                if (pos[0] >= 0 && pos[0] < GRID_HEIGHT && pos[1] >= 0 && pos[1] < GRID_WIDTH) {
+                    grid[pos[0]][pos[1]].status = symbol;
+                }
+            }
+        }
+        
+        function checkAffectedArea(minRow, maxRow, minCol, maxCol) {
+            for (let x = minRow; x <= maxRow; x++) {
+                for (let y = minCol; y <= maxCol; y++) {
+                    check(x, y);
+                }
+            }
+        }
+        
+        function endAttack() {
+            hrtattack = 1;
+            attackInProgress = false;
+            timerPaused = false; // Resume timer after attack
+            updateInfo();
+            render();
+            
+            // Check win condition after attack
+            if (h === 0 && i === 0 && c === 0 && e === 0) {
+                endGame();
+            }
+        }
+        
+        // Attacks
+        async function spadeAttack() {
+            if (spade < 4 || attackInProgress) return;
+            attackInProgress = true;
+            timerPaused = true; // Pause timer during attack
+            
+            hrtattack = 0;
+            score += 5;
+            if (pop === 0) spade -= 4;
+            
+            // Capture attack position at start - don't change if player moves
+            const attackRow = row === 0 ? 1 : (row === GRID_HEIGHT - 1 ? GRID_HEIGHT - 2 : row);
+            const attackCol = col === 0 ? 1 : (col === GRID_WIDTH - 1 ? GRID_WIDTH - 2 : col);
+            
+            if (soundEnabled) playSound(500, 1);
+            
+            // Destroy surrounding walls (8 cells) - animate step by step
+            const positions = [
+                [attackRow - 1, attackCol], [attackRow + 1, attackCol], [attackRow, attackCol - 1], [attackRow, attackCol + 1],
+                [attackRow - 1, attackCol - 1], [attackRow - 1, attackCol + 1], [attackRow + 1, attackCol - 1], [attackRow + 1, attackCol + 1]
+            ];
+            
+            // Store original states for all positions
+            const originalStates = storeOriginalStates(positions);
+            
+            // First phase: show spades in cross pattern (on all cells)
+            setAttackSymbols([[attackRow - 1, attackCol], [attackRow + 1, attackCol], [attackRow, attackCol - 1], [attackRow, attackCol + 1]], STATUS_SPADE);
+            render();
+            await sleep(300);
+            
+            // Second phase: show spades in corners (on all cells)
+            setAttackSymbols([[attackRow - 1, attackCol - 1], [attackRow - 1, attackCol + 1], [attackRow + 1, attackCol - 1], [attackRow + 1, attackCol + 1]], STATUS_SPADE);
+            render();
+            await sleep(300);
+            
+            // Restore original states, but clear walls
+            restoreStatesAndClearWalls(positions, originalStates);
+            render();
+            await sleep(200);
+            
+            // Check surrounding cells
+            checkAffectedArea(attackRow - 1, attackRow + 1, attackCol - 1, attackCol + 1);
+            
+            endAttack();
+        }
+        
+        async function clubAttack() {
+            if (club < 5 || attackInProgress) return;
+            attackInProgress = true;
+            timerPaused = true; // Pause timer during attack
+            
+            hrtattack = 0;
+            score += 15;
+            if (pop === 0) club -= 5;
+            
+            // Capture attack position at start - don't change if player moves
+            const attackRow = row <= 1 ? 2 : (row >= GRID_HEIGHT - 2 ? GRID_HEIGHT - 3 : row);
+            const attackCol = col <= 1 ? 2 : (col >= GRID_WIDTH - 2 ? GRID_WIDTH - 3 : col);
+            
+            if (soundEnabled) playSound(500, 1);
+            
+            // Store original states for all positions in 5x5 area
+            const positions = [];
+            for (let x = attackRow - 2; x <= attackRow + 2; x++) {
+                for (let y = attackCol - 2; y <= attackCol + 2; y++) {
+                    if (x >= 0 && x < GRID_HEIGHT && y >= 0 && y < GRID_WIDTH) {
+                        positions.push([x, y]);
+                    }
+                }
+            }
+            const originalStates = storeOriginalStates(positions);
+            
+            // Animation phase 1: outer ring (on all cells)
+            const outerRing = [];
+            for (let x = attackRow - 2; x <= attackRow + 2; x++) {
+                for (let y = attackCol - 2; y <= attackCol + 2; y++) {
+                    if (x >= 0 && x < GRID_HEIGHT && y >= 0 && y < GRID_WIDTH) {
+                        // Outer ring only (corners and edges)
+                        if ((x === attackRow - 2 || x === attackRow + 2) || (y === attackCol - 2 || y === attackCol + 2)) {
+                            outerRing.push([x, y]);
+                        }
+                    }
+                }
+            }
+            setAttackSymbols(outerRing, STATUS_CLUB);
+            render();
+            await sleep(300);
+            
+            // Animation phase 2: inner ring (on all cells)
+            const innerRing = [];
+            for (let x = attackRow - 1; x <= attackRow + 1; x++) {
+                for (let y = attackCol - 1; y <= attackCol + 1; y++) {
+                    if (x >= 0 && x < GRID_HEIGHT && y >= 0 && y < GRID_WIDTH) {
+                        innerRing.push([x, y]);
+                    }
+                }
+            }
+            setAttackSymbols(innerRing, STATUS_CLUB);
+            render();
+            await sleep(300);
+            
+            // Restore original states, but clear walls
+            restoreStatesAndClearWalls(positions, originalStates);
+            render();
+            await sleep(200);
+            
+            // Check destroyed area
+            checkAffectedArea(attackRow - 2, attackRow + 2, attackCol - 2, attackCol + 2);
+            
+            endAttack();
+        }
+        
+        async function diamondAttack() {
+            if (diamond < 7 || attackInProgress) return;
+            attackInProgress = true;
+            timerPaused = true; // Pause timer during attack
+            
+            hrtattack = 0;
+            if (pop === 0) diamond -= 7;
+            score += 50;
+            
+            // Capture attack position at start - don't change if player moves
+            const attackRow = row === 0 ? 1 : (row === GRID_HEIGHT - 1 ? GRID_HEIGHT - 2 : row);
+            const attackCol = col === 0 ? 1 : (col === GRID_WIDTH - 1 ? GRID_WIDTH - 2 : col);
+            
+            diamondAttackActive = true;
+            updateInfo();
+            
+            // Wait for direction input
+            return new Promise((resolve) => {
+                const handler = (e) => {
+                    let direction = null;
+                    if (e.key === 'ArrowUp') direction = 'up';
+                    else if (e.key === 'ArrowDown') direction = 'down';
+                    else if (e.key === 'ArrowLeft') direction = 'left';
+                    else if (e.key === 'ArrowRight') direction = 'right';
+                    else return;
+                    
+                    e.preventDefault();
+                    clearTimeout(timeout);
+                    document.removeEventListener('keydown', wrappedHandler);
+                    diamondAttackActive = false;
+                    
+                    let start, end, step, isRow;
+                    if (direction === 'up') {
+                        start = attackRow - 1;
+                        end = 0;
+                        step = -1;
+                        isRow = true;
+                    } else if (direction === 'down') {
+                        start = attackRow + 1;
+                        end = GRID_HEIGHT - 1;
+                        step = 1;
+                        isRow = true;
+                    } else if (direction === 'left') {
+                        start = attackCol - 1;
+                        end = 0;
+                        step = -1;
+                        isRow = false;
+                    } else { // right
+                        start = attackCol + 1;
+                        end = GRID_WIDTH - 1;
+                        step = 1;
+                        isRow = false;
+                    }
+                    
+                    // Destroy row or column with animation
+                    (async () => {
+                        // Build positions array for the row/column
+                        const positions = [];
+                        for (let pos = start; pos !== end + step; pos += step) {
+                            if (isRow) {
+                                if (pos >= 0 && pos < GRID_HEIGHT) {
+                                    positions.push([pos, attackCol]);
+                                }
+                            } else {
+                                if (pos >= 0 && pos < GRID_WIDTH) {
+                                    positions.push([attackRow, pos]);
+                                }
+                            }
+                        }
+                        
+                        // Store original states for the row/column
+                        const originalStates = storeOriginalStates(positions);
+                        
+                        // First pass: show diamonds (on all cells)
+                        for (let pos of positions) {
+                            setAttackSymbols([pos], STATUS_DIAMOND);
+                            if (soundEnabled) playSound(300 + (isRow ? pos[0] : pos[1]), 0.3);
+                            render();
+                            await sleep(80);
+                        }
+                        
+                        // Second pass: restore original states, but clear walls
+                        await sleep(200);
+                        for (let pos of positions) {
+                            const key = `${pos[0]},${pos[1]}`;
+                            const original = originalStates.get(key);
+                            // Only destroy walls, preserve all items and empty cells
+                            if (original === STATUS_WALL) {
+                                grid[pos[0]][pos[1]].status = STATUS_EMPTY;
+                            } else {
+                                grid[pos[0]][pos[1]].status = original;
+                            }
+                            render();
+                            await sleep(30);
+                        }
+                        
+                        // Check surrounding
+                        checkAffectedArea(attackRow - 1, attackRow + 1, attackCol - 1, attackCol + 1);
+                        
+                        endAttack();
+                        
+                        resolve();
+                    })();
+                };
+                
+                // Add timeout to prevent hanging if user doesn't press arrow key
+                let timeout;
+                const wrappedHandler = (e) => {
+                    clearTimeout(timeout);
+                    handler(e);
+                };
+                
+                timeout = setTimeout(() => {
+                    document.removeEventListener('keydown', wrappedHandler);
+                    diamondAttackActive = false;
+                    hrtattack = 1;
+                    attackInProgress = false;
+                    timerPaused = false; // Resume timer after attack timeout
+                    updateInfo();
+                    resolve();
+                }, 10000); // 10 second timeout
+                
+                document.addEventListener('keydown', wrappedHandler, { once: false });
+            });
+        }
+        
+        async function heartAttack() {
+            if (heart < 10 || attackInProgress) return;
+            attackInProgress = true;
+            timerPaused = true; // Pause timer during attack
+            
+            if (pop === 0) heart -= 10;
+            score += 100;
+            
+            if (current > 3) {
+                // Add 10 seconds (but still allow wall destruction)
+                time += 10;
+                updateInfo();
+                // Don't return - continue to wall destruction logic
+            }
+            
+            // Transform items
+            for (let x = 0; x < GRID_HEIGHT; x++) {
+                for (let y = 0; y < GRID_WIDTH; y++) {
+                    if (current === 0) {
+                        if (grid[x][y].status === STATUS_SPADE) {
+                            grid[x][y].status = STATUS_CLUB;
+                            e--;
+                            c++;
+                            if (soundEnabled) playSound(37 + x / 10, 0.5);
+                        }
+                    } else if (current === 1) {
+                        if (grid[x][y].status === STATUS_CLUB) {
+                            grid[x][y].status = STATUS_DIAMOND;
+                            c--;
+                            i++;
+                            if (soundEnabled) playSound(37 + x / 10, 0.5);
+                        }
+                    } else if (current === 2) {
+                        if (grid[x][y].status === STATUS_DIAMOND) {
+                            grid[x][y].status = STATUS_HEART;
+                            i--;
+                            h++;
+                            if (soundEnabled) playSound(37 + x / 10, 0.5);
+                        }
+                    } else if (current >= 3) {
+                        // Destroy 70% of walls (partial destruction) - can be used multiple times
+                        if (grid[x][y].status === STATUS_WALL) {
+                            // Randomly destroy 70% of walls
+                            if (Math.random() < 0.7) {
+                                destroyedWalls.push({x: x, y: y});
+                                grid[x][y].status = STATUS_EMPTY;
+                                // Remove from any regeneration queue
+                                const cell = grid[x][y];
+                                if (cell.regenTimeout) {
+                                    clearTimeout(cell.regenTimeout);
+                                    delete cell.regenTimeout;
+                                }
+                                if (soundEnabled) playSound(37 + x / 10, 0.5);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            for (let x = 0; x < GRID_HEIGHT; x++) {
+                for (let y = 0; y < GRID_WIDTH; y++) {
+                    check(x, y);
+                }
+            }
+            
+            // If walls were destroyed, set up gradual regeneration
+            if (current >= 3 && destroyedWalls.length > 0) {
+                // Clear any existing regeneration timers to reset the delay
+                if (wallRegenTimeout) {
+                    clearTimeout(wallRegenTimeout);
+                    wallRegenTimeout = null;
+                }
+                // Clear any existing regeneration intervals
+                wallRegenIntervals.forEach(intervalId => {
+                    clearInterval(intervalId);
+                });
+                wallRegenIntervals = [];
+                
+                // Start regeneration after 15 seconds, but gradually
+                const regenStartTime = Date.now() + 15000; // 15 seconds from now
+                const regenDuration = 10000; // 10 seconds to regenerate all walls
+                const regenInterval = 200; // Regenerate one wall every 200ms
+                
+                // Shuffle walls for random regeneration order
+                const shuffledWalls = [...destroyedWalls].sort(() => Math.random() - 0.5);
+                
+                wallRegenTimeout = setTimeout(() => {
+                    let wallIndex = 0;
+                    const regenIntervalId = setInterval(() => {
+                        if (wallIndex >= shuffledWalls.length || !gameRunning) {
+                            clearInterval(regenIntervalId);
+                            return;
+                        }
+                        
+                        const wall = shuffledWalls[wallIndex];
+                        // Only regenerate if the cell is still empty (not occupied by items)
+                        if (grid[wall.x][wall.y].status === STATUS_EMPTY) {
+                            const cell = grid[wall.x][wall.y];
+                            cell.status = STATUS_WALL;
+                            cell.wallOpacity = 0; // Start invisible
+                            
+                            // Fade in animation over 500ms
+                            const fadeStart = Date.now();
+                            const fadeDuration = 500;
+                            const fadeInterval = 16; // ~60fps
+                            
+                            const fadeIntervalId = setInterval(() => {
+                                if (!gameRunning || grid[wall.x][wall.y].status !== STATUS_WALL) {
+                                    clearInterval(fadeIntervalId);
+                                    return;
+                                }
+                                
+                                const elapsed = Date.now() - fadeStart;
+                                if (elapsed >= fadeDuration) {
+                                    cell.wallOpacity = 1.0;
+                                    delete cell.wallOpacity; // Remove opacity property once fully visible
+                                    clearInterval(fadeIntervalId);
+                                } else {
+                                    cell.wallOpacity = elapsed / fadeDuration;
+                                }
+                                render();
+                            }, fadeInterval);
+                            
+                            // Remove from destroyedWalls array
+                            const index = destroyedWalls.findIndex(w => w.x === wall.x && w.y === wall.y);
+                            if (index >= 0) {
+                                destroyedWalls.splice(index, 1);
+                            }
+                        }
+                        
+                        wallIndex++;
+                    }, regenInterval);
+                    
+                    wallRegenIntervals.push(regenIntervalId);
+                }, 15000);
+            }
+            
+            current++;
+            endAttack();
+        }
+        
+        function playSound(freq, duration) {
+            if (!soundEnabled) return;
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = freq;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        function endGame() {
+            if (!gameRunning) return; // Prevent multiple calls
+            gameRunning = false;
+            
+            // Clear all wall regeneration intervals
+            wallRegenIntervals.forEach(intervalId => {
+                clearInterval(intervalId);
+            });
+            wallRegenIntervals = [];
+            
+            // Clear the main regeneration timeout
+            if (wallRegenTimeout) {
+                clearTimeout(wallRegenTimeout);
+                wallRegenTimeout = null;
+            }
+            
+            // Clear any pending regeneration timeouts
+            for (let x = 0; x < GRID_HEIGHT; x++) {
+                for (let y = 0; y < GRID_WIDTH; y++) {
+                    const cell = grid[x][y];
+                    if (cell.regenTimeout) {
+                        clearTimeout(cell.regenTimeout);
+                        delete cell.regenTimeout;
+                    }
+                }
+            }
+            
+            let finalScore = score + time + (spade * 5) + (club * 10) + (diamond * 20) + (heart * 50);
+            if (finalScore > 99999) finalScore = 99999;
+            finalScore = parseInt(finalScore.toString() + '00');
+            
+            // Stop rendering immediately - clear canvas
+            ctx.fillStyle = '#000080';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Hide game canvas
+            canvas.style.display = 'none';
+            
+            // Update score for high score comparison
+            score = finalScore;
+            
+            // Show high scores immediately (no need to press a key)
+            showHighScores();
+        }
+        
+        function showHighScores() {
+            // Hide game over screen
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // Show high score screen immediately
+            const highScoreScreen = document.getElementById('highScoreScreen');
+            highScoreScreen.style.display = 'flex';
+            
+            // Load high scores from localStorage
+            let highScores = JSON.parse(localStorage.getItem('mannieHighScores') || '[]');
+            if (highScores.length === 0) {
+                // Initialize with default scores
+                highScores = [
+                    { name: 'BST', score: 50000 },
+                    { name: 'ABC', score: 40000 },
+                    { name: 'XYZ', score: 30000 },
+                    { name: 'DEF', score: 20000 },
+                    { name: 'GHI', score: 10000 },
+                    { name: 'JKL', score: 9000 },
+                    { name: 'MNO', score: 8000 },
+                    { name: 'PQR', score: 7000 },
+                    { name: 'STU', score: 6000 },
+                    { name: 'VWX', score: 5000 }
+                ];
+            }
+            
+            // Check if score qualifies
+            let place = -1;
+            for (let i = 0; i < highScores.length; i++) {
+                if (score >= highScores[i].score) {
+                    place = i;
+                    break;
+                }
+            }
+            
+            if (place >= 0) {
+                // Insert new score
+                const newScore = { name: '___', score: score };
+                highScores.splice(place, 0, newScore);
+                highScores = highScores.slice(0, 10);
+                
+                // Show initials input
+                document.getElementById('initialsContainer').style.display = 'block';
+                const input = document.getElementById('initialsInput');
+                input.value = '';
+                input.focus();
+                
+                // Display scores with placeholder for new entry (highlight the new entry)
+                displayHighScores(highScores, null, place);
+                
+                // Handle input
+                const inputHandler = (e) => {
+                    if (e.key === 'Enter' && input.value.length > 0) {
+                        newScore.name = input.value.toUpperCase().substring(0, 3);
+                        input.removeEventListener('keydown', inputHandler);
+                        document.getElementById('initialsContainer').style.display = 'none';
+                        // Redisplay with updated name (still highlight the new entry)
+                        displayHighScores(highScores, null, place);
+                        // Save scores
+                        localStorage.setItem('mannieHighScores', JSON.stringify(highScores));
+                        // Add exit handler after initials are entered
+                        const exitHandler = () => {
+                            document.removeEventListener('keydown', exitHandler);
+                            location.reload();
+                        };
+                        document.addEventListener('keydown', exitHandler, { once: true });
+                    } else if (e.key === 'Backspace') {
+                        // Allow backspace
+                        if (input.value.length > 0) {
+                            input.value = input.value.slice(0, -1);
+                        }
+                    } else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) {
+                        if (input.value.length < 3) {
+                            input.value += e.key.toUpperCase();
+                        }
+                        e.preventDefault();
+                    }
+                };
+                
+                input.addEventListener('keydown', inputHandler);
+            } else {
+                // Score doesn't qualify, show table with player's score at bottom
+                displayHighScores(highScores, score);
+                // Save scores (in case defaults were initialized)
+                localStorage.setItem('mannieHighScores', JSON.stringify(highScores));
+            }
+        }
+        
+        function displayHighScores(highScores, playerScore = null, highlightIndex = -1) {
+            // Ensure high score screen is visible
+            const highScoreScreen = document.getElementById('highScoreScreen');
+            highScoreScreen.style.display = 'flex';
+            
+            const list = document.getElementById('highScoreList');
+            const initialsContainer = document.getElementById('initialsContainer');
+            const isEnteringInitials = initialsContainer.style.display === 'block';
+            
+            let html = '<table style="margin: 20px; border-collapse: collapse;"><tr><th style="padding: 10px; border: 1px solid #0ff;">Rank</th><th style="padding: 10px; border: 1px solid #0ff;">Name</th><th style="padding: 10px; border: 1px solid #0ff;">Score</th></tr>';
+            
+            highScores.forEach((entry, index) => {
+                // Highlight the new entry if it matches the highlight index
+                const isHighlighted = index === highlightIndex;
+                const bgColor = isHighlighted ? '#ffff00' : 'transparent';
+                const textColor = isHighlighted ? '#000080' : '#fff';
+                html += `<tr style="background-color: ${bgColor};"><td style="padding: 10px; border: 1px solid #0ff; color: ${textColor};">${index + 1}</td><td style="padding: 10px; border: 1px solid #0ff; color: ${textColor};">${entry.name}</td><td style="padding: 10px; border: 1px solid #0ff; color: ${textColor};">${entry.score}</td></tr>`;
+            });
+            
+            html += '</table>';
+            
+            // Show player's score at bottom if they didn't qualify
+            if (playerScore !== null && !isEnteringInitials) {
+                html += `<p style="margin-top: 20px; color: #ccc;">Your score: ${playerScore}</p>`;
+            }
+            
+            list.innerHTML = html;
+        }
+        
+        function showTopTenFromMain() {
+            // Pause timer while viewing top 10
+            timerPaused = true;
+            
+            // Load high scores from localStorage
+            let highScores = JSON.parse(localStorage.getItem('mannieHighScores') || '[]');
+            if (highScores.length === 0) {
+                // Initialize with default scores
+                highScores = [
+                    { name: 'BST', score: 50000 },
+                    { name: 'ABC', score: 40000 },
+                    { name: 'XYZ', score: 30000 },
+                    { name: 'DEF', score: 20000 },
+                    { name: 'GHI', score: 10000 },
+                    { name: 'JKL', score: 9000 },
+                    { name: 'MNO', score: 8000 },
+                    { name: 'PQR', score: 7000 },
+                    { name: 'STU', score: 6000 },
+                    { name: 'VWX', score: 5000 }
+                ];
+                localStorage.setItem('mannieHighScores', JSON.stringify(highScores));
+            }
+            
+            // Hide game container
+            document.getElementById('gameContainer').style.display = 'none';
+            
+            // Show high score screen
+            displayHighScores(highScores);
+        }
+        
+        function isAnyScreenVisible() {
+            const helpScreen = document.getElementById('helpScreen');
+            const highScoreScreen = document.getElementById('highScoreScreen');
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            const pauseOverlay = document.getElementById('pauseOverlay');
+            
+            return helpScreen.style.display === 'block' ||
+                   highScoreScreen.style.display === 'flex' ||
+                   gameOverScreen.style.display === 'flex' ||
+                   pauseOverlay.style.display === 'flex';
+        }
+        
+        function showHelp() {
+            // Pause timer while viewing help
+            timerPaused = true;
+            
+            const helpContent = document.getElementById('helpContent');
+            helpContent.innerHTML = `
+                <h1>MANNIE Help</h1>
+                <p>Thank you for playing the next best part of BOXES--Mannie!</p>
+                <p>Mannie is only a 1 player game. You are the happy face located somewhere around the upper left hand corner. The object is to try to get a high score by collecting the spades, clubs, diamonds, and hearts. The only trouble is that some walls block your way to some of them. That is why you have special attacks--moves that allow to break through these walls. To move Mannie, the happy face, use the arrow keys. Pause the game by pushing 'P'. To toggle on or off sound effects, push 'O'. You have three and a half minutes to collect the items! When you collect all the items or time runs out, you will receive 100 pts. for each remaining second. You will receive points for the each remaining item you have. Their point value is as follows.</p>
+                <p><strong>Spades:</strong> 500 pts. Spades needed to use attack: 4; 5000 pts.<br>
+                Attack Description: Destroys surrounding walls. (Total Destruction: 8)<br>
+                Type 'S' to use the Spade Attack.</p>
+                <p><strong>Clubs:</strong> 1000 pts. Clubs needed to use attack: 5; 15000 pts.<br>
+                Attack Description: Destroys surrounding walls and walls surrounding those. (Total Destruction: 15)<br>
+                Type 'C' to use the Club Attack.</p>
+                <p><strong>Diamonds:</strong> 2000 pts. Diamonds needed to use attack: 7; 50000 pts.<br>
+                Attack Description: You chose row or column to destroy that surrounds you. Spade Attack used too. (Minimum Destruction: 8)<br>
+                Type 'D' to use the Diamond Attack.</p>
+                <p><strong>Hearts:</strong> 5000 pts. Hearts needed to use attack: 10; 100000 pts<br>
+                Attack Description: The first time using it all Spades become Clubs. The second time causes Clubs to become Diamonds. The third time makes all Diamonds become Hearts. The fourth time causes all the walls to disappear. Anytime after that adds 10 seconds to your time.<br>
+                Type 'H' to use the Heart Attack.</p>
+                <p>If you want to ever exit Mannie, simply push 'X'. You don't get any lives in this game, and there is only one level. Try to beat BST if you can.</p>
+                <p style="text-align: center; margin-top: 20px;">TMPCI(C) The Matthew Pava Company, Inc.(C) Saturday, January 2nd, 1998</p>
+            `;
+            document.getElementById('helpScreen').style.display = 'block';
+        }
+        
+        function closeHelp() {
+            document.getElementById('helpScreen').style.display = 'none';
+            timerPaused = false; // Resume timer when closing help
+        }
+        
+        function closeHighScore() {
+            const highScoreScreen = document.getElementById('highScoreScreen');
+            const gameContainer = document.getElementById('gameContainer');
+            const initialsContainer = document.getElementById('initialsContainer');
+            
+            // Don't close if user is entering initials
+            if (initialsContainer.style.display === 'block') {
+                return;
+            }
+            
+            // Only close if viewing from main menu (game container is hidden but game is still running)
+            if (gameContainer.style.display === 'none' && gameRunning) {
+                gameContainer.style.display = 'block';
+                highScoreScreen.style.display = 'none';
+                timerPaused = false; // Resume timer when returning to game
+            }
+            // If viewing from game over (gameRunning is false), don't allow closing (user should use replay button)
+        }
+        
+        // Keyboard input
+        document.addEventListener('keydown', async (e) => {
+            if (!gameRunning) return;
+            
+            // Prevent key repeat for movement keys (reduced delay for faster movement)
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                if (keyProcessed) {
+                    e.preventDefault();
+                    return;
+                }
+                keyProcessed = true;
+                setTimeout(() => { keyProcessed = false; }, 30); // Reset after 30ms for faster movement
+            }
+            
+            if (gamePaused) {
+                if (e.key.toLowerCase() === 'p') {
+                    gamePaused = false;
+                    document.getElementById('pauseOverlay').style.display = 'none';
+                } else if (e.key.toLowerCase() === 'o') {
+                    // Cheat code: 'op' for unlimited attacks
+                    gamePaused = false;
+                    document.getElementById('pauseOverlay').style.display = 'none';
+                    const nextKey = await new Promise(resolve => {
+                        const handler = (ev) => {
+                            document.removeEventListener('keydown', handler);
+                            resolve(ev.key.toLowerCase());
+                        };
+                        document.addEventListener('keydown', handler, { once: true });
+                    });
+                    if (nextKey === 'p') {
+                        pop = 1;
+                        alert('Unlimited Attacks Enabled!');
+                    }
+                }
+                return;
+            }
+            
+            // Don't process other keys during diamond attack
+            if (diamondAttackActive && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                return;
+            }
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    movePlayer(-1, 0);
+                    break;
+                case 'ArrowDown':
+                    movePlayer(1, 0);
+                    break;
+                case 'ArrowLeft':
+                    movePlayer(0, -1);
+                    break;
+                case 'ArrowRight':
+                    movePlayer(0, 1);
+                    break;
+                case 's':
+                case 'S':
+                    if (!isAnyScreenVisible()) {
+                        await spadeAttack();
+                    }
+                    break;
+                case 'c':
+                case 'C':
+                    if (!isAnyScreenVisible()) {
+                        await clubAttack();
+                    }
+                    break;
+                case 'd':
+                case 'D':
+                    if (!isAnyScreenVisible()) {
+                        await diamondAttack();
+                    }
+                    break;
+                case 'h':
+                case 'H':
+                    if (!isAnyScreenVisible()) {
+                        await heartAttack();
+                    }
+                    break;
+                case 'p':
+                case 'P':
+                    gamePaused = true;
+                    document.getElementById('pauseOverlay').style.display = 'flex';
+                    break;
+                case 'o':
+                case 'O':
+                    soundEnabled = !soundEnabled;
+                    alert(`Sound is now ${soundEnabled ? 'ON' : 'OFF'}. Press O to continue.`);
+                    break;
+                case 'x':
+                case 'X':
+                    if (confirm('Do you want to exit Mannie? (Y or N)')) {
+                        location.reload();
+                    }
+                    break;
+                case 'F1':
+                    e.preventDefault();
+                    showHelp();
+                    break;
+                case 'Escape':
+                    if (document.getElementById('helpScreen').style.display === 'block') {
+                        closeHelp();
+                    } else {
+                        // Also allow Escape to close high score screen when viewing from main menu
+                        const highScoreScreen = document.getElementById('highScoreScreen');
+                        const gameContainer = document.getElementById('gameContainer');
+                        if (highScoreScreen.style.display === 'flex' && gameContainer.style.display === 'none') {
+                            closeHighScore();
+                        }
+                    }
+                    break;
+            }
+            
+            if (score > 99999) score = 99999;
+            if (time > 9999) time = 9999;
+            
+            // Only render if game is still running
+            if (gameRunning) {
+                render();
+            }
+        });
+        
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning) {
+                // Don't continue loop if game has ended
+                return;
+            }
+            
+            if (gamePaused) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            const now = Date.now();
+            const currentSecond = Math.floor(now / 1000);
+            
+            // Only decrement timer if not paused
+            if (currentSecond !== lastSecond && !timerPaused) {
+                time--;
+                lastSecond = currentSecond;
+                
+                if (time < 11) {
+                    if (soundEnabled) playSound(100, 1);
+                }
+                
+                if (time <= 0) {
+                    endGame();
+                    return; // Stop loop when game ends
+                }
+                
+                // Check win condition in game loop
+                if (h === 0 && i === 0 && c === 0 && e === 0) {
+                    endGame();
+                    return;
+                }
+                
+                updateInfo();
+            } else if (currentSecond !== lastSecond) {
+                // Update lastSecond even when paused to prevent time loss when resuming
+                lastSecond = currentSecond;
+            }
+            
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Initialize and start
+        initGrid();
+        updateInfo();
+        render();
+        gameLoop();
+    </script>
+</body>
+</html>
