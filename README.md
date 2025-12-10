@@ -1,5 +1,5 @@
 # mannie
-Originally written in 1998, this simple Qbasic game has finally received a well-deserved update! Enjoy the fun in this basic collectibles game that is sure to draw some nostalgia from the old-fashioned games of yesteryear. Special thinks to Claude and Cursor to help make this conversion happen in less than 2.5 hours.
+Originally written in 1998, this simple Qbasic game has finally received a well-deserved update! Enjoy the fun in this basic collectibles game that is sure to draw some nostalgia from the old-fashioned games of yesteryear. I give a special thanks to Claude and Cursor to help make this conversion happen in less than 2.5 hours.
 
 <h1>MANNIE Help</h1>
                 <p>Thank you for playing the next best part of BOXES--Mannie!</p>
